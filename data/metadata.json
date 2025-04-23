@@ -1,0 +1,4 @@
+{
+    "OTHER": "Customer Information:\n- Title: Sir\n- Name: Yasuo\n- Date of Birth: 13/12/1993\n- Social Security Number (SSN): 1122\n- Reference Number: 2345\n- Local Zip Code: 85001\n- Total Debt: $4,000\n- Due Date: 20/02/2025\n- Last 4 digits of credit card: 4567\n- CVV digits: 070",
+    "VERIFY": {"dob":  "13/12/1993", "ref_number":  "2345", "ssn":  "1122", "zipcode":  "85001"}
+}

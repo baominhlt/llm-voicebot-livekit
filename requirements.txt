@@ -1,0 +1,5 @@
+# Python 3.9.21
+httpx==0.28.1
+livekit-agents[openai,silero,deepgram,cartesia,turn-detector]~=1.0rc
+loguru==0.7.3
+python-dotenv==1.1.0
