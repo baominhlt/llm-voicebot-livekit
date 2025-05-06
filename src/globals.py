@@ -30,7 +30,7 @@ metadata = f"Customer Information:\n- Name: {default_name}\n- Total Debt: ${rand
 # VERIFY State information
 default_metadata = {"dob": "", "ssn": "", "zipcode": "", "ref_number": ""}
 default_slot_value = {"dob": "NONE", "ssn": "NONE", "zipcode": "NONE", "ref_number": "NONE"}
-default_prioritize_key = ["ssn"]
-default_number_of_optional_params = 1
+default_prioritize_key = [""]
+default_number_of_optional_params = 0
 default_json_schema = "{key_name: value}"
-num_min_verify_information = 2
+num_min_verify_information = 1

@@ -51,11 +51,9 @@ class DST:
 
     def add_information_into_metadata(self, information: dict):
         global metadata
-        logger.info(f"INFORMATION: {information}")
         for key, value in information.items():
             if str(value).lower() != "none" and metadata_template[key] not in metadata:
                 metadata += f"\n- {metadata_template[key]}: {value}"
-        logger.info(f"Metadata after add information: {metadata}")
         return metadata
 
     async def send(self, dialogue: Any, current_stage: str):
@@ -81,14 +79,13 @@ class DST:
                 logger.info(f"Slot filling DST output: {response}")
                 metadata = self.add_information_into_metadata(information=response["data"]["reply"])
                 if self.validate_verify_information(information=response["data"]["reply"]):
-                    response["next_stage"] = STATE_PURPOSE_STATE
+                    response["data"]["next_stage"] = STATE_PURPOSE_STATE
                     return response
         except Exception as e:
             logger.error(str(e))
 
         url = self.urls[OUT_OF_STATE]
         request_data["metadata"] = metadata
-        logger.info(f"Metadata: {metadata}")
         if current_stage == VERIFY_STATE:
             request_data["json_schema"] = default_json_schema
         response = await self.send_request(url=url, request_data=request_data)
