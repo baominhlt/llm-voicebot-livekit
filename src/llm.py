@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -154,8 +155,6 @@ class LLMStream(llm.LLMStream):
         dst_client = DST()
         dst_response = await dst_client.send(dialogue=chat_context, current_stage=current_stage)
 
-        logger.info(f"DST response: {dst_response}")
-
         if dst_response is not None:
             current_stage = dst_response["data"]["next_stage"]
             log_info = {
@@ -168,6 +167,7 @@ class LLMStream(llm.LLMStream):
             logger.info(f"DST Output: {log_info}")
         # current_stage = current_stage if current_stage != "VERIFY_" else "VERIFY"
 
+        idx = uuid.uuid4().hex
         if current_stage != "END":
             async with httpx.AsyncClient() as client:
                 payload = self.prepare_request_data(dialogue=chat_context, current_stage=current_stage)
@@ -180,16 +180,11 @@ class LLMStream(llm.LLMStream):
                             if END_STREAM_TOKEN in text_chunk:
                                 end_of_chat = True
                             if not end_of_chat:
-                                # tts_stream = ChatCompletionChunk(
-                                #     id=uuid.uuid4().hex,
-                                #     created=1712016000,
-                                #     model="emandai",
-                                #     choices=[{"index": 0, "delta": {"content": text_chunk}, "finish_reason": None}],
-                                #     usage={"prompt_tokens": 0, "completion_tokens": 10, "total_tokens": len(text_chunk)}
-                                # )
-                                # self._event_ch.send_nowait(value=tts_stream)
-                                # TODO: Self-reformat text_chunk or server side reformat to log metrics
-                                self._event_ch.send_nowait(value=text_chunk)
+                                tts_stream = llm.ChatChunk(
+                                    id=idx,
+                                    delta=llm.ChoiceDelta(content=text_chunk, role="assistant"),
+                                )
+                                self._event_ch.send_nowait(value=tts_stream)
                         # logger.info(f"LLM Agent Output: {response.json()}")
                 except Exception as e:
                     raise e
