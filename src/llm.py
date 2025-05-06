@@ -2,24 +2,21 @@ from __future__ import annotations
 
 import copy
 import json
-import uuid
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
-import openai
-from livekit.agents import ChatContext, FunctionTool, APIConnectOptions, DEFAULT_API_CONNECT_OPTIONS, NotGivenOr, \
-    NOT_GIVEN
+from livekit.agents import (DEFAULT_API_CONNECT_OPTIONS, NOT_GIVEN, APIConnectOptions, ChatContext,
+                            FunctionTool, NotGivenOr)
 from livekit.agents.llm import ToolChoice, llm
 from livekit.agents.utils import is_given
 from livekit.plugins.openai.utils import to_chat_ctx
-from loguru import logger
-from openai.types.chat import ChatCompletionChunk
 
 from .dst import DST
-from .globals import metadata, name
+from .globals import default_name, logger, metadata
 
 current_stage = "INTRODUCTION"
+
 
 @dataclass
 class _LLMOptions:
@@ -29,6 +26,7 @@ class _LLMOptions:
     tool_choice: NotGivenOr[ToolChoice]
     store: NotGivenOr[bool]
     metadata: NotGivenOr[dict[str, str]]
+
 
 class LLM(llm.LLM):
     def __init__(
@@ -60,7 +58,6 @@ class LLM(llm.LLM):
                 keepalive_expiry=120,
             ),
         )
-
 
     @staticmethod
     def with_ollama(
@@ -110,7 +107,9 @@ class LLM(llm.LLM):
             extra_kwargs=extra,
         )
 
+
 END_STREAM_TOKEN = "!@#$%^&*()_+"
+
 
 class LLMStream(llm.LLMStream):
     def __init__(
@@ -134,7 +133,7 @@ class LLMStream(llm.LLMStream):
         copy_dialogue = copy.deepcopy(dialogue)
         user_input = copy_dialogue[-1]["content"] if copy_dialogue[-1]["role"] == "user" else ""
         return {
-            "name": name,
+            "name": default_name,
             "metadata": metadata,
             "user_input": user_input,
             "current_stage": current_stage,
@@ -153,19 +152,20 @@ class LLMStream(llm.LLMStream):
 
         chat_context = to_chat_ctx(self._chat_ctx, id(self._llm))
         dst_client = DST()
-        dst_response = await dst_client.send(dialogue=chat_context, metadata=metadata, current_stage=current_stage)
+        dst_response = await dst_client.send(dialogue=chat_context, current_stage=current_stage)
 
-        logger.info(dst_response)
+        logger.info(f"DST response: {dst_response}")
 
         if dst_response is not None:
             current_stage = dst_response["data"]["next_stage"]
-            logger.info({
+            log_info = {
                 "id": dst_response["data"]["transaction_id"],
                 "next_stage": current_stage,
                 "time": dst_response["data"]["time"],
                 "completion_tokens": dst_response["data"]["completion_tokens"],
                 "total_tokens": dst_response["data"]["total_tokens"]
-            })
+            }
+            logger.info(f"DST Output: {log_info}")
         # current_stage = current_stage if current_stage != "VERIFY_" else "VERIFY"
 
         if current_stage != "END":
@@ -190,7 +190,7 @@ class LLMStream(llm.LLMStream):
                                 # self._event_ch.send_nowait(value=tts_stream)
                                 # TODO: Self-reformat text_chunk or server side reformat to log metrics
                                 self._event_ch.send_nowait(value=text_chunk)
-                        logger.info(response.json())
+                        # logger.info(f"LLM Agent Output: {response.json()}")
                 except Exception as e:
                     raise e
         else:
