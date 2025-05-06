@@ -1,29 +1,19 @@
 import logging
+import os
 
 from dotenv import load_dotenv
-
-from livekit.agents import (
-    Agent,
-    AgentSession,
-    JobContext,
-    JobProcess,
-    RoomInputOptions,
-    RoomOutputOptions,
-    RunContext,
-    WorkerOptions,
-    cli,
-    metrics,
-)
+from livekit.agents import (Agent, AgentSession, JobContext, JobProcess, RoomInputOptions, RoomOutputOptions,
+                            RunContext, WorkerOptions, cli, metrics)
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import deepgram, openai, silero
+from livekit.plugins import deepgram, silero
 
+from src.globals import logger
 from src.llm import LLM
+
 # uncomment to enable Krisp background voice/noise cancellation
 # currently supported on Linux and MacOS
 # from livekit.plugins import noise_cancellation
-
-logger = logging.getLogger("basic-agent")
 
 load_dotenv()
 
@@ -72,7 +62,15 @@ class MyAgent(Agent):
 
 
 def prewarm(proc: JobProcess):
-    proc.userdata["vad"] = silero.VAD.load()
+    proc.userdata["vad"] = silero.VAD.load(
+        # min_speech_duration=0.3,
+        # min_silence_duration=0.3,
+        # prefix_padding_duration=0.15,
+        # max_buffered_speech=7.0,
+        # activation_threshold=0.6,
+        # sample_rate=8000,
+        # force_cpu=True,
+    )
 
 
 async def entrypoint(ctx: JobContext):
@@ -87,7 +85,7 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         # any combination of STT, LLM, TTS, or realtime API can be used
         # llm=openai.LLM.with_ollama(base_url="https://29b7-113-176-195-87.ngrok-free.app/v1"),
-        llm=LLM.with_ollama(base_url="https://261d-113-176-195-87.ngrok-free.app/agent/llm-agent/answer-with-collector"),
+        llm=LLM.with_ollama(base_url=os.getenv("AI_AGENT_ENDPOINT", None)),
         stt=deepgram.STT(model="nova-3", language="multi"),
         tts=deepgram.TTS(),
         # use LiveKit's turn detection model
