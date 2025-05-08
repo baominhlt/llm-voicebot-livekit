@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import time
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -24,6 +25,7 @@ class DST:
         }
         self.headers = {"Content-Type": "application/json"}
         self.prepare_authorization(api_key=api_key)
+        self.metadata = metadata
 
     def prepare_authorization(self, api_key: Optional[str]):
         api_key = api_key if api_key is not None else os.getenv("DST_API_KEY", None)
@@ -50,14 +52,12 @@ class DST:
         return len(information) - list(information.values()).count("None") >= num_min_verify_information
 
     def add_information_into_metadata(self, information: dict):
-        global metadata
         for key, value in information.items():
-            if str(value).lower() != "none" and metadata_template[key] not in metadata:
-                metadata += f"\n- {metadata_template[key]}: {value}"
-        return metadata
+            if str(value).lower() != "none" and metadata_template[key] not in self.metadata:
+                self.metadata += f"\n- {metadata_template[key]}: {value}"
 
     async def send(self, dialogue: Any, current_stage: str):
-        global metadata
+        start = time.perf_counter()
         request_data = {
             "length_type": length_type,
             "name": default_name,
@@ -77,18 +77,20 @@ class DST:
                 })
                 response = await self.send_request(url=url, request_data=verify_request_data)
                 logger.info(f"Slot filling DST output: {response}")
-                metadata = self.add_information_into_metadata(information=response["data"]["reply"])
+                self.add_information_into_metadata(information=response["data"]["reply"])
                 if self.validate_verify_information(information=response["data"]["reply"]):
                     response["data"]["next_stage"] = STATE_PURPOSE_STATE
+                    response["data"]["client_time"] = round(time.perf_counter() - start, 3)
                     return response
         except Exception as e:
             logger.error(str(e))
 
         url = self.urls[OUT_OF_STATE]
-        request_data["metadata"] = metadata
+        request_data["metadata"] = self.metadata
         if current_stage == VERIFY_STATE:
             request_data["json_schema"] = default_json_schema
         response = await self.send_request(url=url, request_data=request_data)
+        response["data"]["client_time"] = round(time.perf_counter() - start, 3)
         return response
 
     async def send_request(self, url: URL, request_data: dict) -> Any:
@@ -96,7 +98,7 @@ class DST:
             try:
                 response = await client.post(url=url, headers=self.headers, data=json.dumps(request_data),
                                              timeout=DEFAULT_TIMEOUT)
-                response.raise_for_status()
+                # response.raise_for_status()
                 return response.json()
             except httpx.HTTPError as e:
                 logger.exception(f"{e}\nLog input request: {request_data}")
