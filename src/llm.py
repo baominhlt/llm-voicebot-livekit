@@ -189,7 +189,16 @@ class LLMStream(llm.LLMStream):
                                     delta=llm.ChoiceDelta(content=text_chunk, role="assistant"),
                                 )
                                 self._event_ch.send_nowait(value=tts_stream)
-                        logger.info(f"LLM Agent Output: {output_log}")
+                        output_log = json.loads(output_log.strip().replace("\n", "\\n"))
+                        llm_log = llm.ChatChunk(
+                            id=idx,
+                            usage=llm.CompletionUsage(
+                                completion_tokens=output_log["completion_tokens"],
+                                prompt_tokens=output_log["prompt_tokens"],
+                                total_tokens=output_log["total_tokens"],
+                            ),
+                        )
+                        self._event_ch.send_nowait(llm_log)
                 except Exception as e:
                     logger.exception(f"LLM Agent Exception: {str(e)}\nInput Request: {payload}")
         else:
