@@ -17,6 +17,7 @@ from .dst import DST
 from .globals import default_name, logger, metadata
 
 current_stage = "INTRODUCTION"
+LLM_REQUEST_TIMEOUT = 30
 
 
 @dataclass
@@ -162,7 +163,8 @@ class LLMStream(llm.LLMStream):
                 "next_stage": current_stage,
                 "time": dst_response["data"]["time"],
                 "completion_tokens": dst_response["data"]["completion_tokens"],
-                "total_tokens": dst_response["data"]["total_tokens"]
+                "total_tokens": dst_response["data"]["total_tokens"],
+                "client_time": dst_response["data"]["client_time"]
             }
             logger.info(f"DST Output: {log_info}")
         # current_stage = current_stage if current_stage != "VERIFY_" else "VERIFY"
@@ -171,22 +173,25 @@ class LLMStream(llm.LLMStream):
         if current_stage != "END":
             async with httpx.AsyncClient() as client:
                 payload = self.prepare_request_data(dialogue=chat_context, current_stage=current_stage)
+                output_log = ""
                 try:
-                    async with client.stream("POST", url=self._llm._base_url, headers=self._headers, data=json.dumps(payload), timeout=20) as response:
-                        response.raise_for_status()
+                    async with client.stream("POST", url=self._llm._base_url, headers=self._headers, data=json.dumps(payload), timeout=LLM_REQUEST_TIMEOUT) as response:
+                        # response.raise_for_status()
                         end_of_chat = False
                         async for chunk in response.aiter_bytes():
                             text_chunk = chunk.decode("utf-8", errors="ignore")
                             if END_STREAM_TOKEN in text_chunk:
                                 end_of_chat = True
+                                output_log += chunk.decode("utf-8", errors="ignore").replace(END_STREAM_TOKEN, "").strip()
                             if not end_of_chat:
                                 tts_stream = llm.ChatChunk(
                                     id=idx,
                                     delta=llm.ChoiceDelta(content=text_chunk, role="assistant"),
                                 )
                                 self._event_ch.send_nowait(value=tts_stream)
-                        # logger.info(f"LLM Agent Output: {response.json()}")
+                        logger.info(f"LLM Agent Output: {output_log}")
                 except Exception as e:
-                    raise e
+                    logger.exception(f"LLM Agent Exception: {str(e)}\nInput Request: {payload}")
         else:
             current_stage = "INTRODUCTION"
+        logger.info(f"History: {chat_context}")

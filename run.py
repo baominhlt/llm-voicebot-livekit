@@ -1,11 +1,13 @@
+import datetime
 import os
 
 from dotenv import load_dotenv
+from livekit import api
 from livekit.agents import (Agent, AgentSession, JobContext, JobProcess, RoomInputOptions, RoomOutputOptions,
                             RunContext, WorkerOptions, cli, metrics)
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import deepgram, silero
+from livekit.plugins import deepgram, silero, elevenlabs
 
 from src.globals import logger
 from src.llm import LLM
@@ -19,11 +21,7 @@ load_dotenv()
 
 class MyAgent(Agent):
     def __init__(self) -> None:
-        super().__init__(
-            instructions="Your name is Kelly. You would interact with users via voice."
-            "with that in mind keep your responses concise and to the point."
-            "You are curious and friendly, and have a sense of humor.",
-        )
+        super().__init__(instructions="")
 
     async def on_enter(self):
         # when the agent is added to the session, it'll generate a reply
@@ -61,15 +59,17 @@ class MyAgent(Agent):
 
 
 def prewarm(proc: JobProcess):
-    proc.userdata["vad"] = silero.VAD.load(
-        # min_speech_duration=0.3,
-        # min_silence_duration=0.3,
-        # prefix_padding_duration=0.15,
-        # max_buffered_speech=7.0,
-        # activation_threshold=0.6,
-        # sample_rate=8000,
-        # force_cpu=True,
-    )
+    # proc.userdata["vad"] = silero.VAD.load(
+    #     min_speech_duration=0.3,
+    #     min_silence_duration=0.3,
+    #     # prefix_padding_duration=0.15,
+    #     max_buffered_speech=7.0,
+    #     activation_threshold=0.6,
+    #     sample_rate=8000,
+    #     force_cpu=True,
+    # )
+    proc.userdata["vad"] = silero.VAD.load(min_silence_duration=0.1, prefix_padding_duration=0.3, min_speech_duration=0.1,
+                    max_buffered_speech=40, activation_threshold=0.4)
 
 
 async def entrypoint(ctx: JobContext):
@@ -80,15 +80,18 @@ async def entrypoint(ctx: JobContext):
     }
     await ctx.connect()
 
+    logger.info(f"BEGIN NEW SESSION AT {datetime.datetime.now()}")
+
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
         # any combination of STT, LLM, TTS, or realtime API can be used
         # llm=openai.LLM.with_ollama(base_url="https://29b7-113-176-195-87.ngrok-free.app/v1"),
         llm=LLM.with_ollama(base_url=os.getenv("AI_AGENT_ENDPOINT", None)),
         stt=deepgram.STT(model="nova-3", language="multi"),
+        # tts=elevenlabs.TTS(),
         tts=deepgram.TTS(),
         # use LiveKit's turn detection model
-        # turn_detection=MultilingualModel(),
+        turn_detection="vad",
     )
 
     # log metrics as they are emitted, and total usage after session is over
@@ -121,4 +124,12 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
+    token = api.AccessToken(os.getenv('LIVEKIT_API_KEY'), os.getenv('LIVEKIT_API_SECRET')) \
+        .with_identity("identity-JFDq") \
+        .with_name("name") \
+        .with_grants(api.VideoGrants(
+        room_join=True,
+        room="experiment19032025",
+    )).to_jwt()
+    print(token)
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm))
