@@ -7,7 +7,7 @@ from livekit.agents import (Agent, AgentSession, JobContext, JobProcess, RoomInp
                             RunContext, WorkerOptions, cli, metrics)
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import deepgram, silero, elevenlabs
+from livekit.plugins import deepgram, silero
 
 from src.globals import logger
 from src.llm import LLM
@@ -124,12 +124,4 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
-    token = api.AccessToken(os.getenv('LIVEKIT_API_KEY'), os.getenv('LIVEKIT_API_SECRET')) \
-        .with_identity("identity-JFDq") \
-        .with_name("name") \
-        .with_grants(api.VideoGrants(
-        room_join=True,
-        room="experiment19032025",
-    )).to_jwt()
-    print(token)
     cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm))
