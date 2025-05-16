@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass, field
 from typing import Annotated, Optional, Union
+from uuid import uuid4
 
 import yaml
 from dotenv import load_dotenv
@@ -11,6 +12,7 @@ from livekit.agents.llm import function_tool
 from livekit.agents.voice import Agent, AgentSession, RunContext
 from livekit.agents.voice.room_io import RoomInputOptions
 from livekit.plugins import silero
+from livekit.plugins.openai.utils import to_chat_ctx
 from pydantic import Field
 
 from src.agent_models import AgentModel
@@ -374,7 +376,7 @@ async def entrypoint(ctx: JobContext):
 
     async def log_usage():
         summary = usage_collector.get_summary()
-        logger.info(f"History: {session._chat_ctx}")
+        logger.info(f"History: {to_chat_ctx(session._chat_ctx, id(session))}")
         logger.info(f"Usage: {summary}")
 
     # shutdown callbacks are triggered when the session is over
