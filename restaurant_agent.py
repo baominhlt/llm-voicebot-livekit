@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass, field
 from typing import Annotated, Optional, Union
 
@@ -348,6 +349,9 @@ async def entrypoint(ctx: JobContext):
             "checkout": Checkout(menu),
         }
     )
+
+    logger.info(f"BEGIN NEW SESSION AT {datetime.datetime.now()}")
+
     session = AgentSession[UserData](
         userdata=userdata,
         stt=AgentModel.STT,
